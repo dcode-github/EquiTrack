@@ -10,7 +10,6 @@ var DB *sql.DB
 func InitDatabase(db *sql.DB) {
 	DB = db
 
-	// Optional: Run migrations or ensure tables exist
 	_, err := db.Exec(`
         CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,
