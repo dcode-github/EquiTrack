@@ -19,11 +19,11 @@ func AddInvestment(db *sql.DB) http.HandlerFunc {
 
 		current_time := time.Now().Format("2006-01-02")
 		_, err := db.Exec(
-			"INSERT INTO investments (user_id, stock, units, price, purchase_date) VALUES (?, ?, ?, ?, ?)",
+			"INSERT INTO investments (user_id, instrument, qty, avg, purchase_date) VALUES (?, ?, ?, ?, ?)",
 			investment.UserId,
-			investment.Stock,
-			investment.Units,
-			investment.Price,
+			investment.Instrument,
+			investment.Qty,
+			investment.Avg,
 			current_time,
 		)
 		if err != nil {
@@ -34,22 +34,22 @@ func AddInvestment(db *sql.DB) http.HandlerFunc {
 		var units int
 		var price float64
 
-		err = db.QueryRow("SELECT units, price FROM portfolio WHERE user_id = ? AND stock = ?", investment.UserId, investment.Stock).Scan(&units, &price)
+		err = db.QueryRow("SELECT qty, avg FROM portfolio WHERE user_id = ? AND instrument = ?", investment.UserId, investment.Instrument).Scan(&units, &price)
 		if err == nil {
 			fmt.Println("Current units:", units, "Current price:", price)
 
-			tot_units := units + investment.Units
-			avg_price := (price*float64(units) + investment.Price*float64(investment.Units)) / float64(tot_units)
+			tot_units := units + investment.Qty
+			avg_price := (price*float64(units) + investment.Avg*float64(investment.Qty)) / float64(tot_units)
 
 			fmt.Println("Updated total units:", tot_units, "Updated average price:", avg_price)
 
 			_, err = db.Exec(
-				"UPDATE portfolio SET units = ?, price = ?, tot_amt = ? WHERE user_id = ? AND stock = ?",
+				"UPDATE portfolio SET qty = ?, avg = ?, tot_amt = ? WHERE user_id = ? AND instrument = ?",
 				tot_units,
 				avg_price,
-				avg_price*float64(tot_units),
+				roundToTwoDecimalPlaces(avg_price*float64(tot_units)),
 				investment.UserId,
-				investment.Stock,
+				investment.Instrument,
 			)
 			if err != nil {
 				fmt.Println("Error updating portfolio:", err)
@@ -58,12 +58,12 @@ func AddInvestment(db *sql.DB) http.HandlerFunc {
 			}
 		} else {
 			_, err = db.Exec(
-				"INSERT INTO portfolio (user_id, stock, units, price, tot_amt) VALUES (?, ?, ?, ?, ?)",
+				"INSERT INTO portfolio (user_id, instrument, qty, avg, tot_amt) VALUES (?, ?, ?, ?, ?)",
 				investment.UserId,
-				investment.Stock,
-				investment.Units,
-				investment.Price,
-				investment.Price*float64(investment.Units),
+				investment.Instrument,
+				investment.Qty,
+				investment.Avg,
+				investment.Avg*float64(investment.Qty),
 			)
 			if err != nil {
 				fmt.Println("Portfolio update error")

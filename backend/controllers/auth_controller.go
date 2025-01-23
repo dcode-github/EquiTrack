@@ -3,50 +3,56 @@ package controllers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/dcode-github/EquiTrack/backend/utils"
 )
 
-var credentials struct {
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
 func Login(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var credentials struct {
+			Username string `json:"username"`
+			Email    string `json:"email"`
+			Password string `json:"password"`
+		}
 		if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 		defer r.Body.Close()
 
-		var hashedPassword string
-		err := db.QueryRow("SELECT password FROM users WHERE username = ?", credentials.Username).Scan(&hashedPassword)
+		fmt.Println(credentials)
+		var hashedPassword, userID string
+		err := db.QueryRow("SELECT id, password FROM users WHERE username = ?", credentials.Username).Scan(&userID, &hashedPassword)
 		if err != nil {
 			http.Error(w, "User not found", http.StatusUnauthorized)
 			return
 		}
-
 		if !utils.CheckPasswordHash(credentials.Password, hashedPassword) {
 			http.Error(w, "Invalid password", http.StatusUnauthorized)
 			return
 		}
-
 		token, err := utils.GenerateJWT(credentials.Username)
 		if err != nil {
 			http.Error(w, "Error generating token", http.StatusInternalServerError)
 			return
 		}
-
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"token": token})
+		json.NewEncoder(w).Encode(map[string]string{
+			"token": token,
+			"id":    userID,
+		})
 	}
 }
 
 func Register(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		var credentials struct {
+			Username string `json:"username"`
+			Email    string `json:"email"`
+			Password string `json:"password"`
+		}
 		if err := json.NewDecoder(r.Body).Decode(&credentials); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest)
 			return
