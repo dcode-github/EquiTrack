@@ -94,7 +94,8 @@ The application will now be accessible at `http://localhost:3000`.
 ![image](https://github.com/user-attachments/assets/df0e7201-e42b-4d2d-92bc-316e334a42a8)
 
 ### Dashboard
-![image](https://github.com/user-attachments/assets/f215f969-67b4-4bba-b298-6e192292e8fc)
+![image](https://github.com/user-attachments/assets/8725e85a-dd21-471d-a37c-7467a17fb143)
+
 
 
 
