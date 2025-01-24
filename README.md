@@ -9,10 +9,18 @@ EquiTrack is a stock tracking platform designed to help users manage their inves
 - **Expandable Details**: Click on a stock to view detailed individual investments.
 - **Interactive Dashboard**: A clean and intuitive UI to provide summaries of total investments, current value, and profit & loss.
 
+## Screenshots
+
+### Login Page
+![image](https://github.com/user-attachments/assets/df0e7201-e42b-4d2d-92bc-316e334a42a8)
+
+### Dashboard
+![image](https://github.com/user-attachments/assets/402b16a4-2006-47bb-89ab-69003c12bdee)
+
 ## Tech Stack
 
-- **Frontend**: React, Ant Design (AntD) for a responsive and visually appealing user interface.
-- **Backend**: Golang for building a robust and scalable API.
+- **Frontend**: ReactJs, Ant Design (AntD) for a responsive and visually appealing user interface.
+- **Backend**: Golang for building robust and scalable APIs, MySQL for data storage.
 - **Styling**: Custom CSS with responsive design to ensure compatibility across devices.
 
 ## Installation and Setup
@@ -87,14 +95,6 @@ The application will now be accessible at `http://localhost:3000`.
 - **DELETE /investments**
   - Remove an investment.
   - Query Params: `id`
-
-## Screenshots
-
-### Login Page
-![image](https://github.com/user-attachments/assets/df0e7201-e42b-4d2d-92bc-316e334a42a8)
-
-### Dashboard
-![image](https://github.com/user-attachments/assets/402b16a4-2006-47bb-89ab-69003c12bdee)
 
 
 
