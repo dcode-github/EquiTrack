@@ -4,17 +4,40 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/PuerkitoBio/goquery"
 )
 
 type StockData struct {
 	Price            float64 `json:"price"`
 	PercentageChange float64 `json:"per_change"`
+}
+
+func extractStockArray(scriptContent string) ([]float64, error) {
+	re := regexp.MustCompile(`"INR",\[([^\]]+)\]`)
+	matches := re.FindStringSubmatch(scriptContent)
+
+	if len(matches) < 2 {
+		return nil, fmt.Errorf("no INR array found")
+	}
+
+	arrayStr := matches[1]
+	stringValues := strings.Split(arrayStr, ",")
+	stockArray := make([]float64, len(stringValues))
+
+	for i, valStr := range stringValues {
+		val, err := strconv.ParseFloat(strings.TrimSpace(valStr), 64)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing value: %v", err)
+		}
+		stockArray[i] = val
+	}
+
+	return stockArray, nil
 }
 
 func LivePrice(db *sql.DB) http.HandlerFunc {
@@ -24,71 +47,47 @@ func LivePrice(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Instrument is required", http.StatusBadRequest)
 			return
 		}
-		url := fmt.Sprintf("https://www.screener.in/company/%s/consolidated/", instrument)
-		price, percentageChange, err := extractStockData(url)
+		url := fmt.Sprintf("https://www.google.com/finance/quote/%s:NSE", instrument)
+		resp, err := http.Get(url)
+		if err != nil {
+			http.Error(w, "Error fetching data: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		defer resp.Body.Close()
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			http.Error(w, "Error reading response: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		re := regexp.MustCompile(`<script class="ds:2"[^>]*>(.*?)</script>`)
+		matches := re.FindStringSubmatch(string(body))
+
+		if len(matches) < 2 {
+			http.Error(w, "No script tag with class 'ds:2' found", http.StatusInternalServerError)
+			return
+		}
+
+		scriptContent := matches[1]
+		stockArray, err := extractStockArray(scriptContent)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		price = roundToTwoDecimalPlaces(price)
-		percentageChange = roundToTwoDecimalPlaces(percentageChange)
+		price := roundToTwoDecimalPlaces(stockArray[0])
+		percentageChange := roundToTwoDecimalPlaces(stockArray[2])
+
 		data := StockData{
 			Price:            price,
 			PercentageChange: percentageChange,
 		}
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(data)
 	}
 }
 
-func parsePrice(price string) (float64, error) {
-	cleanedPrice := strings.Replace(price, "₹", "", -1)
-	cleanedPrice = strings.Replace(cleanedPrice, ",", "", -1)
-	parsedPrice, err := strconv.ParseFloat(strings.TrimSpace(cleanedPrice), 64)
-	if err != nil {
-		return 0, fmt.Errorf("error parsing price: %v", err)
-	}
-
-	return parsedPrice, nil
-}
-
-func parsePercentage(percentage string) (float64, error) {
-	cleanedPercentage := strings.TrimSpace(percentage)
-	cleanedPercentage = strings.TrimSuffix(cleanedPercentage, "%")
-	parsedPercentage, err := strconv.ParseFloat(cleanedPercentage, 64)
-	if err != nil {
-		return 0, fmt.Errorf("error parsing percentage change: %v", err)
-	}
-	return parsedPercentage, nil
-}
-
 func roundToTwoDecimalPlaces(value float64) float64 {
 	return math.Round(value*100) / 100
-}
-
-func extractStockData(url string) (float64, float64, error) {
-	res, err := http.Get(url)
-	if err != nil {
-		return 0, 0, err
-	}
-	defer res.Body.Close()
-	if res.StatusCode != 200 {
-		return 0, 0, fmt.Errorf("error: Status Code %d", res.StatusCode)
-	}
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	if err != nil {
-		return 0, 0, err
-	}
-	priceText := doc.Find(".font-size-18.strong .flex span").First().Text()
-	percentageText := doc.Find(".font-size-12.down.margin-left-4").Text()
-	parsedPrice, err := parsePrice(priceText)
-	if err != nil {
-		return 0, 0, err
-	}
-	parsedPercentageChange, err := parsePercentage(percentageText)
-	if err != nil {
-		return 0, 0, err
-	}
-
-	return parsedPrice, parsedPercentageChange, nil
 }

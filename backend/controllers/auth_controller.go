@@ -3,7 +3,6 @@ package controllers
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/dcode-github/EquiTrack/backend/utils"
@@ -22,7 +21,6 @@ func Login(db *sql.DB) http.HandlerFunc {
 		}
 		defer r.Body.Close()
 
-		fmt.Println(credentials)
 		var hashedPassword, userID string
 		err := db.QueryRow("SELECT id, password FROM users WHERE username = ?", credentials.Username).Scan(&userID, &hashedPassword)
 		if err != nil {

@@ -3,10 +3,23 @@ package controllers
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 )
+
+type Investment struct {
+	UserId           int       `json:"user_id"`
+	Instrument       string    `json:"instrument"`
+	Qty              int       `json:"qty"`
+	Avg              float64   `json:"avg"`
+	Price            float64   `json:"ltp"`
+	TotInvestment    float64   `json:"tot_invest"`
+	CurVal           float64   `json:"currVal"`
+	PNL              float64   `json:"pnl"`
+	NetChg           float64   `json:"netChng"`
+	PercentageChange float64   `json:"dayChng"`
+	Date             time.Time `json:"date"`
+}
 
 func AddInvestment(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -36,12 +49,9 @@ func AddInvestment(db *sql.DB) http.HandlerFunc {
 
 		err = db.QueryRow("SELECT qty, avg FROM portfolio WHERE user_id = ? AND instrument = ?", investment.UserId, investment.Instrument).Scan(&units, &price)
 		if err == nil {
-			fmt.Println("Current units:", units, "Current price:", price)
 
 			tot_units := units + investment.Qty
 			avg_price := (price*float64(units) + investment.Avg*float64(investment.Qty)) / float64(tot_units)
-
-			fmt.Println("Updated total units:", tot_units, "Updated average price:", avg_price)
 
 			_, err = db.Exec(
 				"UPDATE portfolio SET qty = ?, avg = ?, tot_amt = ? WHERE user_id = ? AND instrument = ?",
@@ -52,7 +62,6 @@ func AddInvestment(db *sql.DB) http.HandlerFunc {
 				investment.Instrument,
 			)
 			if err != nil {
-				fmt.Println("Error updating portfolio:", err)
 				http.Error(w, "Error updating portfolio", http.StatusInternalServerError)
 				return
 			}
@@ -66,7 +75,6 @@ func AddInvestment(db *sql.DB) http.HandlerFunc {
 				investment.Avg*float64(investment.Qty),
 			)
 			if err != nil {
-				fmt.Println("Portfolio update error")
 				http.Error(w, "Error adding investment", http.StatusInternalServerError)
 				return
 			}

@@ -7,20 +7,13 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"time"
 )
 
-type Investment struct {
-	UserId           int       `json:"user_id"`
-	Instrument       string    `json:"instrument"`
-	Qty              int       `json:"qty"`
-	Avg              float64   `json:"avg"`
-	Price            float64   `json:"ltp"`
-	CurVal           float64   `json:"currVal"`
-	PNL              float64   `json:"pnl"`
-	NetChg           float64   `json:"netChng"`
-	PercentageChange float64   `json:"dayChng"`
-	Date             time.Time `json:"date"`
+type TotalInvestmentData struct {
+	TotalInvestment float64 `json:"total_investment"`
+	TotalCurrentVal float64 `json:"total_currVal"`
+	TotalPNL        float64 `json:"total_pnl"`
+	TotalPNLPercent float64 `json:"total_pnl_percent"`
 }
 
 func GetInvestment(db *sql.DB) http.HandlerFunc {
@@ -40,6 +33,7 @@ func GetInvestment(db *sql.DB) http.HandlerFunc {
 		defer rows.Close()
 
 		var investments []Investment
+		var totalInvestment, totalCurrentVal, totalPNL float64
 
 		for rows.Next() {
 			var investment Investment
@@ -48,6 +42,7 @@ func GetInvestment(db *sql.DB) http.HandlerFunc {
 				http.Error(w, fmt.Sprintf("Error scanning investment data: %v", err), http.StatusInternalServerError)
 				return
 			}
+			investment.Avg = roundToTwoDecimalPlaces(investment.Avg)
 
 			stock, err := fetchLivePrice(investment.Instrument)
 			if err != nil {
@@ -59,9 +54,14 @@ func GetInvestment(db *sql.DB) http.HandlerFunc {
 				investment.PercentageChange = stock.PercentageChange
 			}
 
+			investment.TotInvestment = float64(investment.Qty) * investment.Avg
 			investment.CurVal = roundToTwoDecimalPlaces(investment.Price * float64(investment.Qty))
 			investment.PNL = roundToTwoDecimalPlaces(float64(investment.Qty) * (investment.Price - investment.Avg))
 			investment.NetChg = roundToTwoDecimalPlaces(investment.PNL / (investment.Avg * float64(investment.Qty)) * 100.0)
+
+			totalInvestment += investment.TotInvestment
+			totalCurrentVal += investment.CurVal
+			totalPNL += investment.PNL
 
 			investments = append(investments, investment)
 		}
@@ -71,13 +71,33 @@ func GetInvestment(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		var totalPNLPercent float64
+		if totalInvestment > 0 {
+			totalPNLPercent = roundToTwoDecimalPlaces((totalPNL / totalInvestment) * 100)
+		}
+
+		totalData := TotalInvestmentData{
+			TotalInvestment: totalInvestment,
+			TotalCurrentVal: totalCurrentVal,
+			TotalPNL:        totalPNL,
+			TotalPNLPercent: totalPNLPercent,
+		}
+
+		response := struct {
+			Investments         []Investment        `json:"investments"`
+			TotalInvestmentData TotalInvestmentData `json:"total_investment_data"`
+		}{
+			Investments:         investments,
+			TotalInvestmentData: totalData,
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		if len(investments) == 0 {
 			w.WriteHeader(http.StatusNotFound)
 			json.NewEncoder(w).Encode(map[string]string{"message": "No investments found for the user"})
 		} else {
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(investments)
+			json.NewEncoder(w).Encode(response)
 		}
 	}
 }
