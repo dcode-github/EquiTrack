@@ -17,10 +17,10 @@ const formatNumber = (num) => {
 const StockTracker = () => {
   const [data, setData] = useState([]);
   const [totalInvestmentData, setTotalInvestmentData] = useState({
-    totalInvestment: 0,
-    totalCurrentVal: 0,
-    totalPNL: 0,
-    totalPNLPercent: 0,
+    total_investment: 0,
+    total_currVal: 0,
+    total_pnl: 0,
+    total_pnl_percent: 0,
   });
   const [loading, setLoading] = useState(true);
   const [expandedRowKeys, setExpandedRowKeys] = useState([]);
@@ -48,7 +48,7 @@ const StockTracker = () => {
       const investments = await response.json();
 
       setData(investments.investments);
-      setTotalInvestmentData(investments.total_investment_data);
+      setTotalInvestmentData(investments.total_investment_data||0);
       setLoading(false);
     } catch (error) {
       console.error("Error fetching investments:", error);
@@ -258,22 +258,28 @@ const StockTracker = () => {
         <Row gutter={[16, 16]}>
           <Col span={10} className="summary-item">
             <div>
-              <Title level={5}>{formatNumber(totalInvestmentData.total_investment)}</Title>
+              <Title level={5}>
+                {formatNumber(totalInvestmentData.total_investment || 0)}
+              </Title>
               <Text>Total Investment</Text>
             </div>
           </Col>
           <Col span={10} className="summary-item">
             <div>
-              <Title level={5}>{formatNumber(totalInvestmentData.total_currVal)}</Title>
+              <Title level={5}>
+                {formatNumber(totalInvestmentData.total_currVal || 0)}
+              </Title>
               <Text>Current Value</Text>
             </div>
           </Col>
           <Col span={10} className="summary-item">
             <div>
               <Title level={5}>
-                {formatNumber(totalInvestmentData.total_pnl)}{" "}
+                {formatNumber(totalInvestmentData.total_pnl || 0)}{" "}
                 <Text type={totalInvestmentData.total_pnl > 0 ? "success" : "danger"}>
-                  ({totalInvestmentData.total_pnl_percent > 0 ? `+${totalInvestmentData.total_pnl_percent}%` : `${totalInvestmentData.total_pnl_percent}%`})
+                  {totalInvestmentData.total_pnl_percent > 0
+                    ? `+${totalInvestmentData.total_pnl_percent}%`
+                    : `${totalInvestmentData.total_pnl_percent}%`}
                 </Text>
               </Title>
               <Text>P&L</Text>
