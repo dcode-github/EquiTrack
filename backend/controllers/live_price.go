@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"math"
 	"net/http"
 	"regexp"
@@ -44,12 +45,14 @@ func LivePrice(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		instrument := r.URL.Query().Get("instrument")
 		if instrument == "" {
+			log.Println("No instrument in URL")
 			http.Error(w, "Instrument is required", http.StatusBadRequest)
 			return
 		}
 		url := fmt.Sprintf("https://www.google.com/finance/quote/%s:NSE", instrument)
 		resp, err := http.Get(url)
 		if err != nil {
+			log.Println("Error accessing external API")
 			http.Error(w, "Error fetching data: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -57,6 +60,7 @@ func LivePrice(db *sql.DB) http.HandlerFunc {
 
 		body, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
+			log.Println("Error reading body")
 			http.Error(w, "Error reading response: "+err.Error(), http.StatusInternalServerError)
 			return
 		}

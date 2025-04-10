@@ -3,6 +3,7 @@ package controllers
 import (
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/dcode-github/EquiTrack/backend/utils"
@@ -24,6 +25,7 @@ func Login(db *sql.DB) http.HandlerFunc {
 		var hashedPassword, userID string
 		err := db.QueryRow("SELECT id, password FROM users WHERE username = ?", credentials.Username).Scan(&userID, &hashedPassword)
 		if err != nil {
+			log.Fatalf("User not found %v", credentials.Username)
 			http.Error(w, "User not found", http.StatusUnauthorized)
 			return
 		}
@@ -36,6 +38,7 @@ func Login(db *sql.DB) http.HandlerFunc {
 			http.Error(w, "Error generating token", http.StatusInternalServerError)
 			return
 		}
+		log.Printf("%v Logged In", userID)
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
 			"token": token,

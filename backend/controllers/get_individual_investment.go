@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
+	"time"
 )
 
 func GetIndvInvestment(db *sql.DB) http.HandlerFunc {
@@ -13,6 +15,7 @@ func GetIndvInvestment(db *sql.DB) http.HandlerFunc {
 		userIDStr := r.URL.Query().Get("userId")
 		instrument := r.URL.Query().Get("instrument")
 		user_id, err := strconv.Atoi(userIDStr)
+		log.Println("User id ans instrument ", user_id, instrument)
 		if err != nil || user_id <= 0 {
 			http.Error(w, "Invalid user_id", http.StatusBadRequest)
 			return
@@ -30,10 +33,18 @@ func GetIndvInvestment(db *sql.DB) http.HandlerFunc {
 		for rows.Next() {
 			var investment Investment
 			var id int
-			if err := rows.Scan(&id, &investment.Qty, &investment.Avg, &investment.Date); err != nil {
+			var date time.Time // Scan the raw date into a time.Time value
+
+			// Scan values from the row
+			if err := rows.Scan(&id, &investment.Qty, &investment.Avg, &date); err != nil {
 				http.Error(w, fmt.Sprintf("Error scanning investment data: %v", err), http.StatusInternalServerError)
 				return
 			}
+
+			investment.Instrument = instrument
+			investment.Date = date.Format("2006-01-02")
+
+			log.Println("Investment", investment)
 			investments = append(investments, investment)
 		}
 

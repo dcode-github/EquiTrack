@@ -34,6 +34,8 @@ func main() {
 
 	handler := c.Handler(router)
 
+	// go controllers.DispatcherInstance.BroadcastUpdates()
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"

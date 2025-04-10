@@ -19,6 +19,7 @@ func Routes(router *mux.Router, db *sql.DB) {
 	// router.HandleFunc("/investments/{id}", controllers.UpdateInvestment(db)).Methods("PUT")
 	router.HandleFunc("/investments", controllers.DeleteInvestment(db)).Methods("DELETE")
 	router.HandleFunc("/price", controllers.LivePrice(db)).Methods("GET")
+	router.HandleFunc("/priceWebSocket", controllers.LivePriceWebSocket())
 
 	protectedRouter := router.PathPrefix("/").Subrouter()
 	protectedRouter.Use(middleware.JWTAuthMiddleware)

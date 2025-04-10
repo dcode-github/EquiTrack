@@ -8,17 +8,17 @@ import (
 )
 
 type Investment struct {
-	UserId           int       `json:"user_id"`
-	Instrument       string    `json:"instrument"`
-	Qty              int       `json:"qty"`
-	Avg              float64   `json:"avg"`
-	Price            float64   `json:"ltp"`
-	TotInvestment    float64   `json:"tot_invest"`
-	CurVal           float64   `json:"currVal"`
-	PNL              float64   `json:"pnl"`
-	NetChg           float64   `json:"netChng"`
-	PercentageChange float64   `json:"dayChng"`
-	Date             time.Time `json:"date"`
+	UserId           int     `json:"user_id"`
+	Instrument       string  `json:"instrument"`
+	Qty              int     `json:"qty"`
+	Avg              float64 `json:"avg"`
+	Price            float64 `json:"ltp"`
+	TotInvestment    float64 `json:"tot_invest"`
+	CurVal           float64 `json:"currVal"`
+	PNL              float64 `json:"pnl"`
+	NetChg           float64 `json:"netChng"`
+	PercentageChange float64 `json:"dayChng"`
+	Date             string  `json:"date"`
 }
 
 func AddInvestment(db *sql.DB) http.HandlerFunc {
