@@ -53,31 +53,44 @@ func (d *Dispatcher) run() {
 
 func (d *Dispatcher) broadcastUpdates() {
 	d.mu.Lock()
-	defer d.mu.Unlock()
-
+	instrumentSubscribers := make(map[string][]*Subscription)
 	for sub := range d.clients {
 		for instrument := range sub.Instruments {
-			go func(sub *Subscription, instrument string) {
-				stock, err := fetchLivePrice(instrument)
-				if err != nil {
-					log.Println("Error fetching stock for", instrument)
-					return
-				}
-				update := StockUpdate{
-					Instrument:       instrument,
-					Price:            stock.Price,
-					PercentageChange: stock.PercentageChange,
-				}
-				data, _ := json.Marshal(update)
+			instrumentSubscribers[instrument] = append(instrumentSubscribers[instrument], sub)
+		}
+	}
+	d.mu.Unlock()
 
+	for instrument, subs := range instrumentSubscribers {
+		go func(instrument string, subs []*Subscription) {
+			stock, err := fetchLivePrice(instrument)
+			if err != nil {
+				log.Println("Error fetching stock for", instrument, ":", err)
+				return
+			}
+
+			update := StockUpdate{
+				Instrument:       instrument,
+				Price:            stock.Price,
+				PercentageChange: stock.PercentageChange,
+			}
+
+			data, err := json.Marshal(update)
+			if err != nil {
+				log.Println("JSON marshal error for", instrument, ":", err)
+				return
+			}
+
+			for _, sub := range subs {
 				sub.Mutex.Lock()
-				defer sub.Mutex.Unlock()
-				if err := sub.Conn.WriteMessage(websocket.TextMessage, data); err != nil {
+				err := sub.Conn.WriteMessage(websocket.TextMessage, data)
+				sub.Mutex.Unlock()
+				if err != nil {
 					log.Println("WebSocket write error:", err)
 					d.unregister <- sub
 				}
-			}(sub, instrument)
-		}
+			}
+		}(instrument, subs)
 	}
 }
 
@@ -91,7 +104,7 @@ func LivePriceWebSocket() http.HandlerFunc {
 
 		instruments := r.URL.Query().Get("instrument")
 		if instruments == "" {
-			sendErrorMessage(conn, "instrument query param is required, e.g. ?symbols=TCS,INFY")
+			sendErrorMessage(conn, "instrument query param is required, e.g. ?instrument=TCS,INFY")
 			conn.Close()
 			return
 		}
@@ -102,7 +115,7 @@ func LivePriceWebSocket() http.HandlerFunc {
 			Instruments: make(map[string]bool),
 		}
 		for _, symbol := range instrumentList {
-			sub.Instruments[strings.ToUpper(symbol)] = true
+			sub.Instruments[strings.ToUpper(strings.TrimSpace(symbol))] = true
 		}
 
 		dispatcher.register <- sub
@@ -113,12 +126,15 @@ func LivePriceWebSocket() http.HandlerFunc {
 				break
 			}
 		}
+
 		dispatcher.unregister <- sub
 	}
 }
 
 func sendErrorMessage(conn *websocket.Conn, msg string) {
 	errMsg := map[string]string{"error": msg}
-	data, _ := json.Marshal(errMsg)
-	conn.WriteMessage(websocket.TextMessage, data)
+	data, err := json.Marshal(errMsg)
+	if err == nil {
+		conn.WriteMessage(websocket.TextMessage, data)
+	}
 }
