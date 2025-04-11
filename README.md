@@ -20,7 +20,7 @@ EquiTrack is a stock tracking platform designed to help users manage their inves
 ## Tech Stack
 
 - **Frontend**: ReactJs, Ant Design (AntD) for a responsive and visually appealing user interface.
-- **Backend**: Golang for building robust and scalable APIs, MySQL for data storage.
+- **Backend**: Golang for building robust and scalable APIs, MySQL for data storage and WebSocket for real time price updates.
 - **Styling**: Custom CSS with responsive design to ensure compatibility across devices.
 
 ## Installation and Setup
@@ -95,6 +95,9 @@ The application will now be accessible at `http://localhost:3000`.
 - **DELETE /investments**
   - Remove an investment.
   - Query Params: `id`
+- **WEBSOCKET /priceWebSocket**
+  - Fethes live price of the given list of instruments.
+  - Query Params: `instruments`
 
 
 
