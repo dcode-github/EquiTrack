@@ -5,7 +5,6 @@ const AddInvestmentModal = ({ visible, onCancel, onAddInvestment }) => {
   const [form] = Form.useForm();
 
   const handleSubmit = async (values) => {
-    console.log(values)
     await onAddInvestment(values);
     form.resetFields();
   };
@@ -13,7 +12,7 @@ const AddInvestmentModal = ({ visible, onCancel, onAddInvestment }) => {
   return (
     <Modal
       title="Add Investment"
-      visible={visible}
+      open={visible}
       onCancel={onCancel}
       footer={null}
     >

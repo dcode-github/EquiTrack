@@ -13,11 +13,6 @@ import (
 	"strings"
 )
 
-type StockData struct {
-	Price            float64 `json:"price"`
-	PercentageChange float64 `json:"per_change"`
-}
-
 func extractStockArray(scriptContent string) ([]float64, error) {
 	re := regexp.MustCompile(`"INR",\[([^\]]+)\]`)
 	matches := re.FindStringSubmatch(scriptContent)

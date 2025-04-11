@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
+import { useWebSocket } from "../WebSocketContext.js";
 import { Table, Typography, Row, Col, Tooltip, Modal, Form, Input, Button, notification } from "antd";
 import AddInvestmentModal from "../components/AddInvestmentModal";
+import ChildTable from "./ChildTable.jsx";
 import Navbar from "../components/Navbar";
 import "./StockTracker.css";
 
@@ -23,15 +25,51 @@ const StockTracker = () => {
     total_pnl_percent: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [expandedRowKeys, setExpandedRowKeys] = useState([]);
-  const [intervalId, setIntervalId] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [pageSize, setPageSize] = useState(10);
+  const [childDataMap, setChildDataMap] = useState({});
+  const [ws, setWs] = useState(null);
+  const [liveDataMap, setLiveDataMap] = useState({});
+  const { connect, wsRef } = useWebSocket();
 
   useEffect(() => {
     fetchInvestments();
+
+    return () => {
+      if (ws) ws.close();
+    };
   }, []);
+
+  const connectWebSocket = (instrumentList, staticMap) => {
+    const instrumentsParam = instrumentList.join(",");
+    const socketUrl = `ws://localhost:8080/priceWebSocket?instrument=${encodeURIComponent(instrumentsParam)}`;
+
+    const socket = connect(socketUrl);
+
+    socket.onopen = () => {
+      console.log("WebSocket connected");
+    };
+
+    socket.onmessage = (event) => {
+      const liveData = JSON.parse(event.data);
+
+      setLiveDataMap((prevLiveDataMap) => ({
+        ...prevLiveDataMap,
+        [liveData.instrument]: liveData,
+      }));
+    };
+
+    socket.onclose = () => {
+      console.log("WebSocket closed");
+    };
+
+    socket.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+
+    setWs(socket);
+  };
 
   const fetchInvestments = async () => {
     try {
@@ -45,42 +83,28 @@ const StockTracker = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-      const investments = await response.json();
 
-      setData(investments.investments);
-      setTotalInvestmentData(investments.total_investment_data||0);
+      const investments = await response.json();
+      const staticData = investments.investments;
+
+      const staticMap = {};
+      staticData.forEach(item => {
+        staticMap[item.instrument] = item;
+      });
+
+      setData(staticData);
+      setTotalInvestmentData(investments.total_investment_data || {});
       setLoading(false);
+
+      if (staticData.length > 0) {
+        const instruments = staticData.map(item => item.instrument);
+        connectWebSocket(instruments, staticMap);
+      }
     } catch (error) {
       console.error("Error fetching investments:", error);
       setLoading(false);
     }
   };
-
-  const isWithinTradingHours = () => {
-    const currentHour = new Date().getHours();
-    return currentHour >= 9 && currentHour < 16;
-  };
-
-  useEffect(() => {
-    if (isWithinTradingHours()) {
-      fetchInvestments();
-      const id = setInterval(() => {
-        fetchInvestments();
-      }, 2000);
-      setIntervalId(id);
-    }
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isWithinTradingHours() && intervalId) {
-      clearInterval(intervalId);
-    }
-  }, [intervalId]);
 
   const fetchIndividualInvestments = async (instrument) => {
     try {
@@ -94,41 +118,34 @@ const StockTracker = () => {
           Authorization: `Bearer ${token}`,
         },
       });
-      const individualInvestments = await response.json();
-      return individualInvestments;
+
+      const result = await response.json();
+      setChildDataMap(prev => ({
+        ...prev,
+        [instrument]: result,
+      }));
     } catch (error) {
       console.error("Error fetching individual investments:", error);
-      return [];
     }
   };
 
-  const expandedRowRender = async (record) => {
-    const individualInvestments = await fetchIndividualInvestments(record.instrument);
+  const expandedRowRender = (record) => {
+    const instrument = record.instrument;
+
+    if (!childDataMap[instrument]) {
+      fetchIndividualInvestments(instrument);
+    }
+
+    const rowData = childDataMap[instrument];
+
     return (
-      <Table
-        columns={[
-          {
-            title: "Date",
-            dataIndex: "date",
-            key: "date",
-          },
-          {
-            title: "Quantity",
-            dataIndex: "qty",
-            key: "qty",
-            render: (text) => formatNumber(text).replace("₹", ""),
-          },
-          {
-            title: "Price",
-            dataIndex: "avg",
-            key: "avg",
-            render: (text) => formatNumber(text),
-          },
-        ]}
-        dataSource={individualInvestments}
-        rowKey={(record) => record.date}
-        pagination={false}
-      />
+      <div>
+        {rowData && rowData.length > 0 ? (
+          <ChildTable data={rowData} />
+        ) : (
+          <Text>No data available</Text>
+        )}
+      </div>
     );
   };
 
@@ -137,12 +154,14 @@ const StockTracker = () => {
       const token = sessionStorage.getItem("token");
       const userId = sessionStorage.getItem("userId");
       const qty = parseInt(values.qty, 10);
-      const user_id = parseInt(userId);
       const avg = parseFloat(values.avg);
+      const user_id = parseInt(userId);
+
       if (isNaN(qty) || isNaN(avg)) {
-        console.error("Invalid data: qty should be an integer and avg should be a float.");
+        console.error("Invalid qty/avg values.");
         return;
       }
+
       const response = await fetch("http://localhost:8080/investments", {
         method: "POST",
         headers: {
@@ -150,10 +169,10 @@ const StockTracker = () => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          user_id: user_id,
+          user_id,
           instrument: values.instrument,
-          qty: qty,
-          avg: avg,
+          qty,
+          avg,
         }),
       });
 
@@ -170,9 +189,8 @@ const StockTracker = () => {
       } else {
         notification.error({
           message: "Error Adding Investment",
-          description: `There was an error in recording the investment. Please try again.`,
+          description: result?.error || "Something went wrong.",
         });
-        console.error("Failed to add investment:", result);
       }
     } catch (error) {
       console.error("Error adding investment:", error);
@@ -190,7 +208,11 @@ const StockTracker = () => {
           <Text>
             <strong>{text}</strong>
           </Text>
-          {record.pledged && <Tooltip title="Pledged"><Text className="pledged-tag">P: {record.pledged}</Text></Tooltip>}
+          {record.pledged && (
+            <Tooltip title="Pledged">
+              <Text className="pledged-tag">P: {record.pledged}</Text>
+            </Tooltip>
+          )}
         </div>
       ),
     },
@@ -233,23 +255,64 @@ const StockTracker = () => {
       dataIndex: "pnl",
       key: "pnl",
       sorter: (a, b) => a.pnl - b.pnl,
-      render: (text) => <Text style={{ color: text > 0 ? "green" : "red" }}>{formatNumber(Math.abs(text))}</Text>,
+      render: (text) => (
+        <Text style={{ color: text > 0 ? "green" : "red" }}>
+          {formatNumber(Math.abs(text))}
+        </Text>
+      ),
     },
     {
       title: "Net chg.",
       dataIndex: "netChng",
       key: "netChng",
-      sorter: (a, b) => a.netChng - b.netChng,
-      render: (text) => <Text style={{ color: text > 0 ? "green" : "red" }}>{Math.abs(text)}%</Text>,
+      sorter: (a, b) => parseFloat(a.netChng) - parseFloat(b.netChng),
+      render: (text) => (
+        <Text style={{ color: text > 0 ? "green" : "red" }}>
+          {Math.abs(text)}%
+        </Text>
+      ),
     },
     {
       title: "Day chg.",
       dataIndex: "dayChng",
       key: "dayChng",
-      sorter: (a, b) => a.dayChng - b.dayChng,
-      render: (text) => <Text style={{ color: text > 0 ? "green" : "red" }}>{Math.abs(text)}%</Text>,
+      sorter: (a, b) => parseFloat(a.dayChng) - parseFloat(b.dayChng),
+      render: (text) => (
+        <Text style={{ color: text > 0 ? "green" : "red" }}>
+          {Math.abs(text)}%
+        </Text>
+      ),
     },
   ];
+
+  const updatedData = data.map((staticItem) => {
+    const liveItem = liveDataMap[staticItem.instrument] || {};
+
+    return {
+      ...staticItem,
+      ltp: liveItem.price || 0,
+      dayChng: liveItem.per_change || 0,
+      currVal: (liveItem.price || 0) * staticItem.qty,
+      pnl: (liveItem.price || 0) * staticItem.qty - staticItem.tot_invest,
+      netChng: liveItem.price
+        ? (((liveItem.price * staticItem.qty - staticItem.tot_invest) / staticItem.tot_invest) * 100).toFixed(2)
+        : 0,
+    };
+  });
+
+  useEffect(() => {
+    const total_investment = updatedData.reduce((acc, item) => acc + item.tot_invest, 0);
+    const total_currVal = updatedData.reduce((acc, item) => acc + item.currVal, 0);
+    const total_pnl = total_currVal - total_investment;
+    const total_pnl_percent = total_investment !== 0 ? ((total_pnl / total_investment) * 100).toFixed(2) : 0;
+  
+    setTotalInvestmentData({
+      total_investment,
+      total_currVal,
+      total_pnl,
+      total_pnl_percent,
+    });
+  }, [updatedData]);
 
   return (
     <div className="stock-tracker-container">
@@ -294,6 +357,7 @@ const StockTracker = () => {
           </Button>
         </Row>
       </div>
+
       <AddInvestmentModal
         visible={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
@@ -303,21 +367,21 @@ const StockTracker = () => {
       <div className="table-container">
         <Table
           columns={columns}
-          dataSource={data}
+          dataSource={updatedData}
           rowKey={(record) => record.instrument}
           loading={loading}
           pagination={{
-            pageSize: pageSize,
-            pageSizeOptions: ['5', '10', '20', '50'],
+            pageSize,
+            pageSizeOptions: ["5", "10", "20", "50"],
             showSizeChanger: true,
             onShowSizeChange: (current, size) => setPageSize(size),
           }}
           expandable={{
             expandedRowRender,
-            rowExpandable: (record) => record.expandable !== false,
+            rowExpandable: () => true,
           }}
           className="stock-table"
-          sticky={true}
+          sticky
           bordered
         />
       </div>

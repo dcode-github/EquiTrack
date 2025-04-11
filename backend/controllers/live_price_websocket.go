@@ -5,30 +5,10 @@ import (
 	"log"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
-
-type StockUpdate struct {
-	Instrument       string  `json:"instrument"`
-	Price            float64 `json:"price"`
-	PercentageChange float64 `json:"per_change"`
-}
-
-type Subscription struct {
-	Conn        *websocket.Conn
-	Instruments map[string]bool
-	Mutex       sync.Mutex
-}
-
-type Dispatcher struct {
-	clients    map[*Subscription]bool
-	register   chan *Subscription
-	unregister chan *Subscription
-	mu         sync.Mutex
-}
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },

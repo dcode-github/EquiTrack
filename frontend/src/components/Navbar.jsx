@@ -1,14 +1,18 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+// import { useNavigate } from "react-router-dom";
+import { useWebSocket } from "../WebSocketContext";
 import { LogoutOutlined, SearchOutlined } from '@ant-design/icons';
 import "./Navbar.css";
 
 const Navbar = () => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
+  const {disconnect}=useWebSocket();
 
   const handleLogout = () => {
+    disconnect();
     sessionStorage.removeItem("token");
-    navigate("/");
+    sessionStorage.removeItem("userId");
+    window.location.href = "/";
   };
 
   return (

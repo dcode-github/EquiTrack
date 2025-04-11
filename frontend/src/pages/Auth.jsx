@@ -44,8 +44,6 @@ const Auth = () => {
         throw new Error(data.message || 'Login failed');
       }
 
-      console.log(data);
-
       const token = data['token'];
       const userId = data['id']; 
 

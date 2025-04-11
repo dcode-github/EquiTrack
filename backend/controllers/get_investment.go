@@ -4,17 +4,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 )
-
-type TotalInvestmentData struct {
-	TotalInvestment float64 `json:"total_investment"`
-	TotalCurrentVal float64 `json:"total_currVal"`
-	TotalPNL        float64 `json:"total_pnl"`
-	TotalPNLPercent float64 `json:"total_pnl_percent"`
-}
 
 func GetInvestment(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +25,7 @@ func GetInvestment(db *sql.DB) http.HandlerFunc {
 		defer rows.Close()
 
 		var investments []Investment
-		var totalInvestment, totalCurrentVal, totalPNL float64
+		// var totalInvestment, totalCurrentVal, totalPNL float64
 
 		for rows.Next() {
 			var investment Investment
@@ -44,24 +36,24 @@ func GetInvestment(db *sql.DB) http.HandlerFunc {
 			}
 			investment.Avg = roundToTwoDecimalPlaces(investment.Avg)
 
-			stock, err := fetchLivePrice(investment.Instrument)
-			if err != nil {
-				log.Println("Error fetching live price:", err)
-				investment.Price = 0
-				investment.PercentageChange = 0
-			} else {
-				investment.Price = stock.Price
-				investment.PercentageChange = stock.PercentageChange
-			}
+			// stock, err := fetchLivePrice(investment.Instrument)
+			// if err != nil {
+			// 	log.Println("Error fetching live price:", err)
+			// 	investment.Price = 0
+			// 	investment.PercentageChange = 0
+			// } else {
+			// 	investment.Price = stock.Price
+			// 	investment.PercentageChange = stock.PercentageChange
+			// }
 
 			investment.TotInvestment = float64(investment.Qty) * investment.Avg
-			investment.CurVal = roundToTwoDecimalPlaces(investment.Price * float64(investment.Qty))
-			investment.PNL = roundToTwoDecimalPlaces(float64(investment.Qty) * (investment.Price - investment.Avg))
-			investment.NetChg = roundToTwoDecimalPlaces(investment.PNL / (investment.Avg * float64(investment.Qty)) * 100.0)
+			// investment.CurVal = roundToTwoDecimalPlaces(investment.Price * float64(investment.Qty))
+			// investment.PNL = roundToTwoDecimalPlaces(float64(investment.Qty) * (investment.Price - investment.Avg))
+			// investment.NetChg = roundToTwoDecimalPlaces(investment.PNL / (investment.Avg * float64(investment.Qty)) * 100.0)
 
-			totalInvestment += investment.TotInvestment
-			totalCurrentVal += investment.CurVal
-			totalPNL += investment.PNL
+			// totalInvestment += investment.TotInvestment
+			// totalCurrentVal += investment.CurVal
+			// totalPNL += investment.PNL
 
 			investments = append(investments, investment)
 		}
@@ -71,24 +63,24 @@ func GetInvestment(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		var totalPNLPercent float64
-		if totalInvestment > 0 {
-			totalPNLPercent = roundToTwoDecimalPlaces((totalPNL / totalInvestment) * 100)
-		}
+		// var totalPNLPercent float64
+		// if totalInvestment > 0 {
+		// 	totalPNLPercent = roundToTwoDecimalPlaces((totalPNL / totalInvestment) * 100)
+		// }
 
-		totalData := TotalInvestmentData{
-			TotalInvestment: totalInvestment,
-			TotalCurrentVal: totalCurrentVal,
-			TotalPNL:        totalPNL,
-			TotalPNLPercent: totalPNLPercent,
-		}
+		// totalData := TotalInvestmentData{
+		// 	TotalInvestment: 0,
+		// 	TotalCurrentVal: 0,
+		// 	TotalPNL:        0,
+		// 	TotalPNLPercent: 0,
+		// }
 
 		response := struct {
-			Investments         []Investment        `json:"investments"`
-			TotalInvestmentData TotalInvestmentData `json:"total_investment_data"`
+			Investments []Investment `json:"investments"`
+			// TotalInvestmentData TotalInvestmentData `json:"total_investment_data"`
 		}{
-			Investments:         investments,
-			TotalInvestmentData: totalData,
+			Investments: investments,
+			// TotalInvestmentData: totalData,
 		}
 
 		w.Header().Set("Content-Type", "application/json")
