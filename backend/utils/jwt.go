@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -11,7 +12,8 @@ type Claims struct {
 	jwt.StandardClaims
 }
 
-var jwtKey = []byte("EquiTracker")
+var key = os.Getenv("JWT_KEY")
+var jwtKey = []byte(key)
 
 func GenerateJWT(address string) (string, error) {
 	expirationTime := time.Now().Add(24 * time.Hour)

@@ -6,6 +6,7 @@ import ChildTable from "./ChildTable.jsx";
 import Navbar from "../components/Navbar";
 import "./StockTracker.css";
 
+
 const { Title, Text } = Typography;
 
 const formatNumber = (num) => {
@@ -17,6 +18,10 @@ const formatNumber = (num) => {
 };
 
 const StockTracker = () => {
+  const API_URL = process.env.REACT_APP_API_URL;
+  const WEBSOCKET_URL = process.env.REACT_APP_WEBSOCKET_URL;
+  const PORT = process.env.REACT_APP_PORT;
+
   const [data, setData] = useState([]);
   const [totalInvestmentData, setTotalInvestmentData] = useState({
     total_investment: 0,
@@ -43,7 +48,7 @@ const StockTracker = () => {
 
   const connectWebSocket = (instrumentList, staticMap) => {
     const instrumentsParam = instrumentList.join(",");
-    const socketUrl = `ws://localhost:8080/priceWebSocket?instrument=${encodeURIComponent(instrumentsParam)}`;
+    const socketUrl = `${WEBSOCKET_URL}:${PORT}/priceWebSocket?instrument=${encodeURIComponent(instrumentsParam)}`;
 
     const socket = connect(socketUrl);
 
@@ -76,7 +81,7 @@ const StockTracker = () => {
       const token = sessionStorage.getItem("token");
       const userId = sessionStorage.getItem("userId");
 
-      const response = await fetch(`http://localhost:8080/investments?userId=${userId}`, {
+      const response = await fetch(`${API_URL}:${PORT}/investments?userId=${userId}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -111,7 +116,7 @@ const StockTracker = () => {
       const token = sessionStorage.getItem("token");
       const userId = sessionStorage.getItem("userId");
 
-      const response = await fetch(`http://localhost:8080/individualInvestments?userId=${userId}&instrument=${instrument}`, {
+      const response = await fetch(`${API_URL}:${PORT}/individualInvestments?userId=${userId}&instrument=${instrument}`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -162,7 +167,7 @@ const StockTracker = () => {
         return;
       }
 
-      const response = await fetch("http://localhost:8080/investments", {
+      const response = await fetch(`${API_URL}:${PORT}/investments`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
