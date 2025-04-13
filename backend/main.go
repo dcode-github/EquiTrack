@@ -34,7 +34,8 @@ func main() {
 
 	handler := c.Handler(router)
 
-	// go controllers.DispatcherInstance.BroadcastUpdates()
+	fs := http.FileServer(http.Dir("client"))
+	router.PathPrefix("/").Handler(http.StripPrefix("/", fs))
 
 	port := os.Getenv("PORT")
 	if port == "" {
