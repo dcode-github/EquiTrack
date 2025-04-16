@@ -34,9 +34,6 @@ func main() {
 
 	handler := c.Handler(router)
 
-	fs := http.FileServer(http.Dir("client"))
-	router.PathPrefix("/").Handler(http.StripPrefix("/", fs))
-
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
