@@ -1,11 +1,21 @@
 import React, { useEffect, useState } from "react";
 import { useWebSocket } from "../WebSocketContext.js";
-import { Table, Typography, Row, Col, Tooltip, Modal, Form, Input, Button, notification } from "antd";
+import {
+  Table,
+  Typography,
+  Row,
+  Col,
+  Tooltip,
+  Modal,
+  Form,
+  Input,
+  Button,
+  notification,
+} from "antd";
 import AddInvestmentModal from "../components/AddInvestmentModal";
 import ChildTable from "./ChildTable.jsx";
 import Navbar from "../components/Navbar";
 import "./StockTracker.css";
-
 
 const { Title, Text } = Typography;
 
@@ -36,42 +46,33 @@ const StockTracker = () => {
   const [childDataMap, setChildDataMap] = useState({});
   const [ws, setWs] = useState(null);
   const [liveDataMap, setLiveDataMap] = useState({});
+  const [expandedRowKeys, setExpandedRowKeys] = useState([]); // <-- Added
+
   const { connect, wsRef } = useWebSocket();
 
   useEffect(() => {
     fetchInvestments();
-
     return () => {
       if (ws) ws.close();
     };
   }, []);
 
-  const connectWebSocket = (instrumentList, staticMap) => {
+  const connectWebSocket = (instrumentList) => {
     const instrumentsParam = instrumentList.join(",");
     const socketUrl = `${WEBSOCKET_URL}:${PORT}/priceWebSocket?instrument=${encodeURIComponent(instrumentsParam)}`;
 
     const socket = connect(socketUrl);
 
-    socket.onopen = () => {
-      console.log("WebSocket connected");
-    };
-
+    socket.onopen = () => console.log("WebSocket connected");
     socket.onmessage = (event) => {
       const liveData = JSON.parse(event.data);
-
-      setLiveDataMap((prevLiveDataMap) => ({
-        ...prevLiveDataMap,
+      setLiveDataMap((prev) => ({
+        ...prev,
         [liveData.instrument]: liveData,
       }));
     };
-
-    socket.onclose = () => {
-      console.log("WebSocket closed");
-    };
-
-    socket.onerror = (error) => {
-      console.error("WebSocket error:", error);
-    };
+    socket.onclose = () => console.log("WebSocket closed");
+    socket.onerror = (error) => console.error("WebSocket error:", error);
 
     setWs(socket);
   };
@@ -81,19 +82,22 @@ const StockTracker = () => {
       const token = sessionStorage.getItem("token");
       const userId = sessionStorage.getItem("userId");
 
-      const response = await fetch(`${API_URL}:${PORT}/investments?userId=${userId}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `${API_URL}:${PORT}/investments?userId=${userId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       const investments = await response.json();
       const staticData = investments.investments;
 
       const staticMap = {};
-      staticData.forEach(item => {
+      staticData.forEach((item) => {
         staticMap[item.instrument] = item;
       });
 
@@ -102,8 +106,8 @@ const StockTracker = () => {
       setLoading(false);
 
       if (staticData.length > 0) {
-        const instruments = staticData.map(item => item.instrument);
-        connectWebSocket(instruments, staticMap);
+        const instruments = staticData.map((item) => item.instrument);
+        connectWebSocket(instruments);
       }
     } catch (error) {
       console.error("Error fetching investments:", error);
@@ -116,16 +120,19 @@ const StockTracker = () => {
       const token = sessionStorage.getItem("token");
       const userId = sessionStorage.getItem("userId");
 
-      const response = await fetch(`${API_URL}:${PORT}/individualInvestments?userId=${userId}&instrument=${instrument}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `${API_URL}:${PORT}/individualInvestments?userId=${userId}&instrument=${instrument}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       const result = await response.json();
-      setChildDataMap(prev => ({
+      setChildDataMap((prev) => ({
         ...prev,
         [instrument]: result,
       }));
@@ -152,6 +159,18 @@ const StockTracker = () => {
         )}
       </div>
     );
+  };
+
+  const handleExpand = (expanded, record) => {
+    const instrument = record.instrument;
+    if (expanded) {
+      setExpandedRowKeys([instrument]);
+      if (!childDataMap[instrument]) {
+        fetchIndividualInvestments(instrument);
+      }
+    } else {
+      setExpandedRowKeys((prev) => prev.filter((key) => key !== instrument));
+    }
   };
 
   const addInvestment = async (values) => {
@@ -292,15 +311,20 @@ const StockTracker = () => {
 
   const updatedData = data.map((staticItem) => {
     const liveItem = liveDataMap[staticItem.instrument] || {};
+    const ltp = liveItem.price || 0;
 
     return {
       ...staticItem,
-      ltp: liveItem.price || 0,
+      ltp,
       dayChng: liveItem.per_change || 0,
-      currVal: (liveItem.price || 0) * staticItem.qty,
-      pnl: (liveItem.price || 0) * staticItem.qty - staticItem.tot_invest,
-      netChng: liveItem.price
-        ? (((liveItem.price * staticItem.qty - staticItem.tot_invest) / staticItem.tot_invest) * 100).toFixed(2)
+      currVal: ltp * staticItem.qty,
+      pnl: ltp * staticItem.qty - staticItem.tot_invest,
+      netChng: ltp
+        ? (
+            ((ltp * staticItem.qty - staticItem.tot_invest) /
+              staticItem.tot_invest) *
+            100
+          ).toFixed(2)
         : 0,
     };
   });
@@ -309,8 +333,9 @@ const StockTracker = () => {
     const total_investment = updatedData.reduce((acc, item) => acc + item.tot_invest, 0);
     const total_currVal = updatedData.reduce((acc, item) => acc + item.currVal, 0);
     const total_pnl = total_currVal - total_investment;
-    const total_pnl_percent = total_investment !== 0 ? ((total_pnl / total_investment) * 100).toFixed(2) : 0;
-  
+    const total_pnl_percent =
+      total_investment !== 0 ? ((total_pnl / total_investment) * 100).toFixed(2) : 0;
+
     setTotalInvestmentData({
       total_investment,
       total_currVal,
@@ -344,7 +369,11 @@ const StockTracker = () => {
             <div>
               <Title level={5}>
                 {formatNumber(totalInvestmentData.total_pnl || 0)}{" "}
-                <Text type={totalInvestmentData.total_pnl > 0 ? "success" : "danger"}>
+                <Text
+                  type={
+                    totalInvestmentData.total_pnl > 0 ? "success" : "danger"
+                  }
+                >
                   {totalInvestmentData.total_pnl_percent > 0
                     ? `+${totalInvestmentData.total_pnl_percent}%`
                     : `${totalInvestmentData.total_pnl_percent}%`}
@@ -384,6 +413,8 @@ const StockTracker = () => {
           expandable={{
             expandedRowRender,
             rowExpandable: () => true,
+            expandedRowKeys,
+            onExpand: handleExpand,
           }}
           className="stock-table"
           sticky

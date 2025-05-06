@@ -13,7 +13,7 @@ const formatNumber = (num) => {
 };
 
 const IndividualInvestmentTable = ({ data }) => {
-  console.log("data is "+data);
+  // console.log("data is "+data);
   const columns = [
     {
       title: "Instrument",
