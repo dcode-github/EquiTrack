@@ -6,6 +6,7 @@ EquiTrack is a stock tracking platform designed to help users manage their inves
 
 - **Investment Management**: Add, Edit, and Delete investment records seamlessly.
 - **Real-Time Tracking**: View real-time stock returns and the current value of your portfolio.
+- **Caching**: Freqeuntly accessed data is cached for faster access and smooth user experience.
 - **Expandable Details**: Click on a stock to view detailed individual investments.
 - **Interactive Dashboard**: A clean and intuitive UI to provide summaries of total investments, current value, and profit & loss.
 
@@ -17,10 +18,18 @@ EquiTrack is a stock tracking platform designed to help users manage their inves
 ### Dashboard
 ![image](https://github.com/user-attachments/assets/402b16a4-2006-47bb-89ab-69003c12bdee)
 
+### **Add Investment Modal**
+![image](https://github.com/user-attachments/assets/15f33bd2-2578-4a13-9b00-3dee502f0b65)
+
+### **Expandable Rows**
+![image](https://github.com/user-attachments/assets/318e309f-b232-4730-bab8-2e4a9ca71670)
+
+
+
 ## Tech Stack
 
 - **Frontend**: ReactJs, Ant Design (AntD) for a responsive and visually appealing user interface.
-- **Backend**: Golang for building robust and scalable APIs, MySQL for data storage and WebSocket for real time price updates.
+- **Backend**: Golang for building robust and scalable APIs, Redis for caching, MySQL for data storage and WebSocket for real time price updates.
 - **Styling**: Custom CSS with responsive design to ensure compatibility across devices.
 
 ## Installation and Setup
@@ -32,6 +41,7 @@ Follow these steps to set up the project locally:
 - Node.js (v14+)
 - Golang (v1.19+)
 - MySQL (or any compatible database)
+- Redis
 
 ### Backend Setup
 
