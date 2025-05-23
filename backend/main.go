@@ -21,9 +21,12 @@ func main() {
 	db := config.ConnectDB()
 	defer db.Close()
 
+	redisClient := config.ConnectRedis()
+	defer redisClient.Close()
+
 	router := mux.NewRouter()
 
-	routes.Routes(router, db)
+	routes.Routes(router, db, redisClient)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins:   []string{"*"},

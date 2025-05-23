@@ -1,13 +1,18 @@
 package controllers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
+	"strconv"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
-func AddInvestment(db *sql.DB) http.HandlerFunc {
+func AddInvestment(db *sql.DB, redisClient *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var investment Investment
 		if err := json.NewDecoder(r.Body).Decode(&investment); err != nil {
@@ -16,8 +21,18 @@ func AddInvestment(db *sql.DB) http.HandlerFunc {
 		}
 		defer r.Body.Close()
 
+		cacheKey := "user:" + strconv.Itoa(investment.UserId)
+
+		ctx := context.Background()
+		err := redisClient.Del(ctx, cacheKey).Err()
+		if err != nil {
+			log.Println("Error invalidating cache: ", err)
+		} else {
+			log.Println("Cache invalidated for user: ", investment.UserId)
+		}
+
 		current_time := time.Now().Format("2006-01-02")
-		_, err := db.Exec(
+		_, err = db.Exec(
 			"INSERT INTO investments (user_id, instrument, qty, avg, purchase_date) VALUES (?, ?, ?, ?, ?)",
 			investment.UserId,
 			investment.Instrument,

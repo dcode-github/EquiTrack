@@ -1,14 +1,18 @@
 package controllers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
+
+	"github.com/redis/go-redis/v9"
 )
 
-func DeleteInvestment(db *sql.DB) http.HandlerFunc {
+func DeleteInvestment(db *sql.DB, redisClient *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		investmentId := r.URL.Query().Get("id")
 		id, err := strconv.Atoi(investmentId)
@@ -62,6 +66,16 @@ func DeleteInvestment(db *sql.DB) http.HandlerFunc {
 				http.Error(w, "Error updating portfolio", http.StatusInternalServerError)
 				return
 			}
+		}
+
+		cacheKey := "user:" + strconv.Itoa(investment.UserId)
+
+		ctx := context.Background()
+		err = redisClient.Del(ctx, cacheKey).Err()
+		if err != nil {
+			log.Println("Error invalidating cache: ", err)
+		} else {
+			log.Println("Cache invalidated for user: ", investment.UserId)
 		}
 
 		w.Header().Set("Content-Type", "application/json")

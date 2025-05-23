@@ -1,14 +1,19 @@
 package controllers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
+	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
-func GetInvestment(db *sql.DB) http.HandlerFunc {
+func GetInvestment(db *sql.DB, redisClient *redis.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userIDStr := r.URL.Query().Get("userId")
 		user_id, err := strconv.Atoi(userIDStr)
@@ -17,15 +22,26 @@ func GetInvestment(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		var investments []Investment
+		cacheKey := "user:" + userIDStr
+
+		ctx := context.Background()
+		cachedInvestments, err := redisClient.Get(ctx, cacheKey).Result()
+		if err == nil && cachedInvestments != "" {
+			log.Println("cache hit")
+			fmt.Println(cachedInvestments)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(cachedInvestments))
+			return
+		}
+		log.Println("cache miss")
+
 		rows, err := db.Query("SELECT id, user_id, instrument, qty, avg FROM portfolio WHERE user_id = ?", user_id)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Error querying portfolio: %v", err), http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
-
-		var investments []Investment
-		// var totalInvestment, totalCurrentVal, totalPNL float64
 
 		for rows.Next() {
 			var investment Investment
@@ -36,24 +52,7 @@ func GetInvestment(db *sql.DB) http.HandlerFunc {
 			}
 			investment.Avg = roundToTwoDecimalPlaces(investment.Avg)
 
-			// stock, err := fetchLivePrice(investment.Instrument)
-			// if err != nil {
-			// 	log.Println("Error fetching live price:", err)
-			// 	investment.Price = 0
-			// 	investment.PercentageChange = 0
-			// } else {
-			// 	investment.Price = stock.Price
-			// 	investment.PercentageChange = stock.PercentageChange
-			// }
-
 			investment.TotInvestment = float64(investment.Qty) * investment.Avg
-			// investment.CurVal = roundToTwoDecimalPlaces(investment.Price * float64(investment.Qty))
-			// investment.PNL = roundToTwoDecimalPlaces(float64(investment.Qty) * (investment.Price - investment.Avg))
-			// investment.NetChg = roundToTwoDecimalPlaces(investment.PNL / (investment.Avg * float64(investment.Qty)) * 100.0)
-
-			// totalInvestment += investment.TotInvestment
-			// totalCurrentVal += investment.CurVal
-			// totalPNL += investment.PNL
 
 			investments = append(investments, investment)
 		}
@@ -63,34 +62,31 @@ func GetInvestment(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		// var totalPNLPercent float64
-		// if totalInvestment > 0 {
-		// 	totalPNLPercent = roundToTwoDecimalPlaces((totalPNL / totalInvestment) * 100)
-		// }
-
-		// totalData := TotalInvestmentData{
-		// 	TotalInvestment: 0,
-		// 	TotalCurrentVal: 0,
-		// 	TotalPNL:        0,
-		// 	TotalPNLPercent: 0,
-		// }
+		if len(investments) == 0 {
+			w.WriteHeader(http.StatusNotFound)
+			json.NewEncoder(w).Encode(map[string]string{"message": "No investments found"})
+		}
 
 		response := struct {
 			Investments []Investment `json:"investments"`
-			// TotalInvestmentData TotalInvestmentData `json:"total_investment_data"`
 		}{
 			Investments: investments,
-			// TotalInvestmentData: totalData,
+		}
+
+		investmentJSON, err := json.Marshal(response)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error marshalling response: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		err = redisClient.Set(ctx, cacheKey, string(investmentJSON), 5*time.Minute).Err()
+		if err != nil {
+			log.Println("Error caching investments in Redis: ", err)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		if len(investments) == 0 {
-			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]string{"message": "No investments found for the user"})
-		} else {
-			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(response)
-		}
+		w.WriteHeader(http.StatusOK)
+		w.Write(investmentJSON)
 	}
 }
 
